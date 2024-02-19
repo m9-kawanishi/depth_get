@@ -1,35 +1,61 @@
 import cv2
-import pyrealsense2
-from realsense_depth import *
+import numpy as np
+from realsense_depth import DepthCamera
+from graph import DepthDataVisualizer
 
-point = (400, 300)
+class Application:
+    def __init__(self):
+        self.depth_colormap_scale = 0.05
+        self.drawing = False
+        self.ix, self.iy = -1, -1
+        self.ex, self.ey = -1, -1
+        self.dc = DepthCamera()
 
-def show_distance(event, x, y, args, params):
-    global point
-    point = (x, y)
+    def draw_rectangle(self, event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self.drawing = True
+            self.ix, self.iy = x, y
+            self.ex, self.ey = x, y
 
-# Initialize Camera Intel Realsense
-dc = DepthCamera()
+        elif event == cv2.EVENT_MOUSEMOVE and self.drawing:
+            self.ex, self.ey = x, y
 
-# Create mouse event
-cv2.namedWindow("Color frame")
-cv2.setMouseCallback("Color frame", show_distance)
+        elif event == cv2.EVENT_LBUTTONUP:
+            self.drawing = False
+            self.ex, self.ey = x, y
+            depth_info = self.get_depth_info(self.ix, self.iy, self.ex, self.ey)
+            a = DepthDataVisualizer()
+            a.plot_data(depth_info)
+            a.show()
 
-# 撮影しつづける
-while True:
-    ret, depth_frame, color_frame = dc.get_frame()
+    def get_depth_info(self, ix, iy, ex, ey):
+        depth_frame = self.dc.get_frame()[-1]
+        tmp = []
+        for y in range(min(iy, ey), max(iy, ey)):
+            for x in range(min(ix, ex), max(ix, ex)):
+                depth = depth_frame.get_distance(x, y) * 1000  # Convert to mm
+                tmp.append([x, y, depth])
+        return tmp
 
-    # Show distance for a specific point
-    cv2.circle(color_frame, point, 4, (0, 0, 255))  # マウスの位置にマルを描画
-    distance = depth_frame[point[1], point[0]]  # Depthの値
+    def run(self):
+        while True:
+            ret, depth_frame, color_frame, depth_map, frame = self.dc.get_frame()
+            if not ret:
+                break
 
-    # Depthを画面内に描画
-    cv2.putText(color_frame, "{}mm".format(distance), (point[0], point[1] - 20), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 0), 2)
+            if self.ix != -1 and self.iy != -1 and self.ex != -1 and self.ey != -1:
+                cv2.rectangle(color_frame, (self.ix, self.iy), (self.ex, self.ey), (0, 255, 0), 2)
 
-    cv2.imshow("depth frame", depth_frame)
-    cv2.imshow("Color frame", color_frame)
-    key = cv2.waitKey(1)
+            cv2.imshow("Depth Frame", depth_map)
+            cv2.imshow("Color Frame", color_frame)
+            cv2.setMouseCallback("Color Frame", self.draw_rectangle)
 
-    # Escで終わる
-    if key == 27:
-        break
+            if cv2.waitKey(1) & 0xFF == 27:  # ESC key
+                break
+
+        self.dc.release()
+        cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    app = Application()
+    app.run()

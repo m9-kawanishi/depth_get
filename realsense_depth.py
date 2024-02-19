@@ -1,5 +1,6 @@
 import pyrealsense2 as rs
 import numpy as np
+import cv2
 
 class DepthCamera:
     def __init__(self):
@@ -28,9 +29,11 @@ class DepthCamera:
 
         depth_image = np.asanyarray(depth_frame.get_data())
         color_image = np.asanyarray(color_frame.get_data())
+        # カラーマップへ変換
+        depth_map = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.08), cv2.COLORMAP_JET)
         if not depth_frame or not color_frame:
-            return False, None, None
-        return True, depth_image, color_image
+            return False, None, None, None
+        return True, depth_image, color_image, depth_map, depth_frame
 
     def release(self):
         self.pipeline.stop()
