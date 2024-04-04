@@ -15,6 +15,9 @@ class DepthDataVisualizer:
         zs = [point[2] for point in data]
         colors = zs
 
+        # Z軸を逆転
+        self.ax.set_zlim(max(zs), min(zs))
+
         self.ax.scatter(xs, ys, zs, c=colors, cmap='viridis')
         self.fig.colorbar(plt.cm.ScalarMappable(cmap='viridis'), ax=self.ax, label='Depth')
 
